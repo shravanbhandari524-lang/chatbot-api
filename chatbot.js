@@ -69,7 +69,7 @@ queSchema.index(
 );
 const Que = mongoose.model("Que", queSchema);
 //////////////////////////////////////////////////////////////////////////////////
-const ask = async (req, res) => {
+const ask = async (req, res, next) => {
   req.user = {
     uuid: req.headers["x-user-id"],
     role: req.headers["x-user-role"],
@@ -122,14 +122,9 @@ ${req.body.input}
       .replace(/```/g, "")
       .trim();
     const fields = JSON.parse(cleaned);
-
-    res.json({
-      success: true,
-      id: req.user.uuid,
-      typed: req.user.typed,
-      service: fields.service,
-      quantity: fields.quantity,
-    });
+    req.user.service = fields.service;
+    req.user.qauntity = fields.quantity;
+    next();
   } catch (err) {
     console.log(err);
     res.status(500).json({ success: false, message: "internal server error" });
@@ -138,18 +133,21 @@ ${req.body.input}
 //---------------------------------------------------------------------------------------------------------------------
 const fetchDB = async (req, res) => {
   try {
+    res.json(req.user);
   } catch (err) {
+    console.log(err);
     res.status(500).json("internal server error");
   }
 };
 //---------------------------------------------------------------------------------------------------------------------
-const insertDB = async (req, user) => {
+const insertDB = async (req, res, user) => {
   req.user = {
     id: req.headers["x-user-id"],
     role: req.headers["x-user-role"],
     typed: req.headers["x-user-typed"],
-    service: req.headers["x-user-service"],
-    qauntity: req.headers["x-user-qauntity"],
+    service: req.body.service,
+    qauntity: req.body.qauntity,
+    coordinates: req.body.coordinates,
   };
   try {
     if (
@@ -157,20 +155,23 @@ const insertDB = async (req, user) => {
       !req.user.role ||
       !req.user.typed ||
       !req.user.service ||
-      !req.user.quantity ||
-      req.user.qauntity == 0
+      !req.user.qauntity ||
+      !req.user.coordinates
     ) {
       return res
         .status(400)
-        .json({ success: false, message: "fill all fields" });
+        .json({ success: false, message: "fill all fields", field: req.user });
+    }
+    if (req?.user?.typed != "s") {
+      return res.status(403).json({ success: false, message: "not allowed" });
     }
     const newQue = await Que.create({
-      user_id: req.user.uuid,
+      user_id: req.user.id,
       service: req.user.service,
       typed: req.user.typed,
-      quantity: req.user.quantity,
+      quantity: req.user.qauntity,
       location: {
-        coordinates: coordinates,
+        coordinates: req.user.coordinates,
       },
     });
     console.log("-------------------\n-", newQue);
