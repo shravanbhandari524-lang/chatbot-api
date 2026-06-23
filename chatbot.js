@@ -133,7 +133,21 @@ ${req.body.input}
 //---------------------------------------------------------------------------------------------------------------------
 const fetchDB = async (req, res) => {
   try {
-    res.json(req.user);
+    const ships = await Que.find({
+      service: req.user.service,
+      quantity: { $gte: req.user.qauntity },
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [req.body.coordinates[0], req.body.coordinates[1]],
+          },
+          $maxDistance: 50000,
+        },
+      },
+    }).limit(5);
+
+    res.json(ships);
   } catch (err) {
     console.log(err);
     res.status(500).json("internal server error");
